@@ -11,6 +11,7 @@ use crate::player::Player;
 use crate::player::advancement::rewards::grant_reward;
 use progress::{AdvancementProgress, AdvancementProgressMap};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::borrow::Cow;
 use std::time::UNIX_EPOCH;
 use steel_protocol::packets::game::CSelectAdvancementsTab;
 use steel_protocol::packets::game::CUpdateAdvancements;
@@ -145,6 +146,25 @@ impl PlayerAdvancement {
                 }
             },
         );
+    }
+
+    fn pushed_added(added: &mut Vec<AdvancementNodeRef>, node: AdvancementNodeRef) {
+        for i in 1..value.parent.len() {
+            let mut new_namespace = key.clone();
+            new_namespace.namespace = Cow::Owned(format!("{}_{i}", &new_namespace.namespace));
+            removed.push(new_namespace);
+        }
+        added.push(node);
+    }
+
+    fn pushed_removed(removed: &mut Vec<Identifier>, value: AdvancementRef) {
+        let key = &value.key;
+        removed.push(key.clone());
+        for i in 1..value.parent.len() {
+            let mut new_namespace = key.clone();
+            new_namespace.namespace = Cow::Owned(format!("{}_{i}", &new_namespace.namespace));
+            removed.push(new_namespace);
+        }
     }
 
     /// send the advancement update packet to a player with the updated tree

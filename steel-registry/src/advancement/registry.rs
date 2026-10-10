@@ -6,14 +6,15 @@ use std::io::Write;
 use std::mem::take;
 use steel_utils::Identifier;
 use steel_utils::serial::WriteTo;
+use text_components::Modifier;
 
 pub type AdvancementRef = &'static Advancement;
 
 #[derive(Debug)]
 pub struct AdvancementNode {
     pub children: Vec<usize>,
-    pub parent: Option<usize>,
-    pub value: AdvancementRef,
+    pub parent: Vec<usize>,
+    pub value: Vec<AdvancementRef>,
     pub x: f32,
     pub y: f32,
 }
@@ -34,7 +35,7 @@ impl AdvancementNode {
     }
 
     #[must_use]
-    pub const fn new(value: AdvancementRef, parent: Option<usize>) -> Self {
+    pub const fn new(value: AdvancementRef, parent: Vec<usize>) -> Self {
         Self {
             value,
             parent,
@@ -93,34 +94,37 @@ impl AdvancementRegistry {
         Self::default()
     }
 
-    fn register_with_parent(&mut self, advancement: AdvancementRef, parent_idx: Option<usize>) {
+    fn register_with_parent(&mut self, advancement: AdvancementRef, parent_idx: Vec<usize>) {
         let id = advancement.key.clone();
         let node_idx = self.adv_nodes.len();
         self.adv_nodes
             .push(AdvancementNode::new(advancement, parent_idx));
         self.advancements.push(advancement);
         self.by_key.insert(id, node_idx);
-        if let Some(parent) = parent_idx {
-            let parent_node = self
-                .adv_nodes
-                .get_mut(parent)
-                .expect("unable to get the parent node");
-            parent_node.add_child(node_idx);
-            self.tasks.push(node_idx);
-        } else {
+        if parent_idx.is_empty() {
             self.roots.push(node_idx);
+        } else {
+            for parent in &parent_idx {
+                let parent_node = self
+                    .adv_nodes
+                    .get_mut(parent)
+                    .expect("unable to get the parent node");
+                parent_node.add_child(node_idx);
+            }
+            self.tasks.push(node_idx);
         }
     }
 
     fn try_register(&mut self, advancement: AdvancementRef) -> Option<AdvancementRef> {
         let parent_id = &advancement.parent;
-        let parent_idx: Option<usize> = match parent_id {
-            Some(id) => match self.by_key.get(id) {
-                Some(node) => Some(*node),
+        let mut parent_idx: Vec<usize> = Vec::with_capacity(parent_id.len());
+        for id in parent_id {
+            let parent = match self.by_key.get(id) {
+                Some(node) => *node,
                 None => return Some(advancement),
-            },
-            None => None,
-        };
+            };
+            parent_idx.push(parent);
+        }
         self.register_with_parent(advancement, parent_idx);
         None
     }

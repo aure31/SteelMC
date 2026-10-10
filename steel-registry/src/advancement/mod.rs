@@ -24,7 +24,7 @@ pub mod registry;
 #[derive(Default)]
 pub struct Advancement {
     pub key: Identifier,
-    pub parent: Option<Identifier>,
+    pub parent: Vec<Identifier>,
     pub criteria: BTreeMap<String, Box<dyn AnyCriterion>>,
     pub display: Option<DisplayInfo>,
     pub send_telemetry_event: bool,
@@ -36,7 +36,7 @@ impl Advancement {
     #[inline]
     #[must_use]
     pub const fn is_root(&self) -> bool {
-        self.parent.is_none()
+        self.parent.is_empty()
     }
 
     #[must_use]
@@ -107,7 +107,7 @@ impl Ord for Advancement {
 impl WriteTo for Advancement {
     fn write(&self, writer: &mut impl Write) -> std::io::Result<()> {
         self.key.write(writer)?;
-        self.parent.write(writer)?;
+        self.parent.first().cloned().write(writer)?;
         self.display.write(writer)?;
         self.requirements.write(writer)?;
         self.send_telemetry_event.write(writer)?;
