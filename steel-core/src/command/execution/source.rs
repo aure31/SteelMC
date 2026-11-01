@@ -27,7 +27,11 @@ use steel_registry::{
 use steel_utils::translations;
 use text_components::{Modifier, TextComponent, format::Color};
 
-use super::{CommandExecutionContext, GameProfileArgument, selector::EntitySelector};
+use super::{
+    CommandExecutionContext, GameProfileArgument,
+    selector::EntitySelector,
+    sink::{CommandMessageSink, SenderMessageSink},
+};
 
 type CommandResultCallbackFn = dyn Fn(bool, i32) + Send + Sync;
 
@@ -246,6 +250,7 @@ impl CommandAuthorizationContext {
 #[derive(Clone)]
 pub(crate) struct CommandSource {
     sender: CommandSender,
+    sink: Arc<dyn CommandMessageSink>,
     player: Option<Arc<Player>>,
     entity: Option<SharedEntity>,
     world: Arc<World>,
@@ -299,6 +304,7 @@ impl CommandSource {
         };
 
         Self {
+            sink: Arc::new(SenderMessageSink::new(sender.clone())),
             sender,
             player,
             entity,
@@ -453,7 +459,7 @@ impl CommandSource {
     /// explicitly asked for (e.g. `/version`), not command-result feedback.
     pub(crate) fn send_system_message(&self, message: &TextComponent) {
         if !self.silent {
-            self.sender.send_message(message);
+            self.sink.send_system_message(message);
         }
     }
 
@@ -462,22 +468,21 @@ impl CommandSource {
             return;
         }
 
-        let accepts_success = self
-            .sender
-            .get_player()
-            .is_none_or(|player| player.get_world().get_game_rule(&SEND_COMMAND_FEEDBACK));
-        if accepts_success {
-            self.sender.send_message(message);
+        let to_source = self.sink.accepts_success();
+        let to_admins = broadcast_to_admins && self.sink.should_inform_admins();
+        if to_source {
+            self.sink.send_system_message(message);
         }
-        if broadcast_to_admins {
+        if to_admins {
             self.broadcast_to_admins(message);
         }
     }
 
     pub(crate) fn send_failure(&self, message: TextComponent) {
-        if !self.silent {
-            self.sender.send_message(&message.color(Color::Red));
+        if self.silent || !self.sink.accepts_failure() {
+            return;
         }
+        self.sink.send_system_message(&message.color(Color::Red));
     }
 
     fn sequence_limit(&self) -> usize {
@@ -559,7 +564,7 @@ impl ExecutionCommandSource for CommandSource {
         }
         self.send_failure(error.message_component());
         if let Some(context) = error.context_component() {
-            self.sender.send_message(&context);
+            self.send_system_message(&context);
         }
     }
 }

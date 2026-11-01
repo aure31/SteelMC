@@ -13,6 +13,7 @@ mod queue;
 mod runtime;
 mod score;
 mod selector;
+mod sink;
 mod source;
 mod structure;
 mod suggestions;
