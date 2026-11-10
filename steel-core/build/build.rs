@@ -15,6 +15,7 @@ mod candle_cakes;
 mod common;
 mod entities;
 mod items;
+mod permissions_group;
 mod skull_type;
 mod waxables;
 mod weathering;
