@@ -13,7 +13,7 @@ struct Group {
 
 impl ToTokens for Group {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let allow = self.allow;
+        let allow = &self.allow;
         let inherits = if let Some(inherits) = self.inherits {
             quote! { #inherits }
         } else {
